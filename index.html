@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML Tube - Custom Player</title>
+    
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+
+    <style>
+        :root {
+            --bg-color: #0f0f0f;
+            --card-bg: #1f1f1f;
+            --accent-color: #ff0000;
+            --text-color: #ffffff;
+            --text-muted: #aaaaaa;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding-bottom: 40px;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: var(--text-color);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .logo span {
+            background-color: var(--accent-color);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .search-box {
+            display: flex;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 20px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px 15px;
+            border: 1px solid #333;
+            background-color: #121212;
+            color: #fff;
+            border-radius: 20px 0 0 20px;
+            outline: none;
+            font-size: 16px;
+        }
+
+        .search-box button {
+            padding: 10px 20px;
+            border: none;
+            background-color: #333;
+            color: #fff;
+            border-radius: 0 20px 20px 0;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .search-box button:hover {
+            background-color: #444;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 0 15px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        @media (min-width: 900px) {
+            .container {
+                grid-template-columns: 2fr 1fr;
+            }
+        }
+
+        /* --- Custom Player Styles --- */
+        .player-wrapper {
+            background-color: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            background: #000;
+        }
+
+        /* The hidden iframe backend */
+        .video-container iframe {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 0;
+            pointer-events: none; /* Block directly interacting with actual YT overlay */
+        }
+
+        /* Mask to allow absolute control clicking overlay */
+        .click-shield {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(100% - 50px);
+            z-index: 2;
+            cursor: pointer;
+        }
+
+        .custom-controls {
+            position: relative;
+            z-index: 3;
+            background: rgba(15, 15, 15, 0.95);
+            display: flex;
+            flex-direction: column;
+            padding: 10px 15px;
+            gap: 8px;
+        }
+
+        .progress-row {
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .progress-bar {
+            width: 100%;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #444;
+            height: 5px;
+            border-radius: 3px;
+            outline: none;
+            cursor: pointer;
+            transition: height 0.1s;
+        }
+
+        .progress-bar:hover {
+            height: 8px;
+        }
+
+        .progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent-color);
+            cursor: pointer;
+        }
+
+        .control-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .left-controls, .right-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .ctrl-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 16px;
+            cursor: pointer;
+            outline: none;
+            padding: 5px;
+        }
+
+        .ctrl-btn:hover {
+            color: var(--accent-color);
+        }
+
+        .time-display {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .volume-slider {
+            width: 70px;
+            cursor: pointer;
+        }
+
+        .video-details {
+            margin-top: 15px;
+            padding: 10px 5px;
+        }
+
+        .video-title {
+            font-size: 20px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* --- Sidebar / Search Results --- */
+        .results-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 75vh;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .results-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .results-sidebar::-webkit-scrollbar-thumb {
+            background-color: #333;
+            border-radius: 4px;
+        }
+
+        .video-card {
+            display: flex;
+            gap: 10px;
+            background-color: var(--card-bg);
+            padding: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        .video-card:hover {
+            transform: translateY(-2px);
+            background-color: #2a2a2a;
+        }
+
+        .video-card img {
+            width: 120px;
+            height: 68px;
+            object-fit: cover;
+            border-radius: 4px;
+            background-color: #000;
+        }
+
+        .card-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 500;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .card-channel {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .error-msg {
+            color: #ff4444;
+            background: rgba(255, 68, 68, 0.1);
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-size: 14px;
+            border: 1px solid rgba(255, 68, 68, 0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">HTML<span>Tube</span></div>
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search videos..." value="Lo-Fi Beats">
+            <button id="search-btn">Search</button>
+        </div>
+        <div style="font-size: 12px; color: var(--text-muted);">API v3 Active</div>
+    </header>
+
+    <div class="container">
+        <main>
+            <div class="player-wrapper">
+                <div class="video-container">
+                    <div class="click-shield" id="click-shield"></div>
+                    <div id="yt-iframe-placeholder"></div>
+                </div>
+                
+                <div class="custom-controls">
+                    <div class="progress-row">
+                        <input type="range" id="progress-bar" class="progress-bar" min="0" max="100" value="0">
+                    </div>
+                    <div class="control-buttons">
+                        <div class="left-controls">
+                            <button class="ctrl-btn" id="play-btn">⏵</button>
+                            <div class="volume-container">
+                                <button class="ctrl-btn" id="mute-btn">🔊</button>
+                                <input type="range" id="volume-slider" class="volume-slider" min="0" max="100" value="100">
+                            </div>
+                            <span class="time-display" id="time-display">0:00 / 0:00</span>
+                        </div>
+                        <div class="right-controls">
+                            <button class="ctrl-btn" id="fullscreen-btn">⛶</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="video-details">
+                <h1 class="video-title" id="current-video-title">Loading initial video...</h1>
+                <div id="error-container"></div>
+            </div>
+        </main>
+
+        <aside class="results-sidebar" id="results-sidebar">
+            </aside>
+    </div>
+
+    <script>
+        // PASTE YOUR NEW REGENERATED/RESTRICTED GOOGLE API KEY HERE
+        const API_KEY = 'AIzaSyB54rA0zv3sUs5VUFKoZOWbp2Eka1YQ9v8'; 
+        
+        let player = null;
+        let updateTimelineInterval = null;
+        const defaultVideoId = 'jfKfPfyJRdk'; // Fallback initial video
+
+        const elements = {
+            searchInput: document.getElementById('search-input'),
+            searchBtn: document.getElementById('search-btn'),
+            sidebar: document.getElementById('results-sidebar'),
+            playBtn: document.getElementById('play-btn'),
+            muteBtn: document.getElementById('mute-btn'),
+            volumeSlider: document.getElementById('volume-slider'),
+            progressBar: document.getElementById('progress-bar'),
+            timeDisplay: document.getElementById('time-display'),
+            fullscreenBtn: document.getElementById('fullscreen-btn'),
+            clickShield: document.getElementById('click-shield'),
+            videoTitle: document.getElementById('current-video-title'),
+            errorContainer: document.getElementById('error-container')
+        };
+
+        // Load YouTube IFrame Player API Asynchronously
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        // Required callback hook for YouTube IFrame API initialization
+        function onYouTubeIframeAPIReady() {
+            player = new YT.Player('yt-iframe-placeholder', {
+                height: '100%',
+                width: '100%',
+                videoId: defaultVideoId,
+                playerVars: {
+                    'controls': 0,          // Removes YouTube Native Controls interface
+                    'disablekb': 1,         // Deactivates stock keyboard hooks inside frame
+                    'rel': 0,               // Restricts unrelated recommendations
+                    'modestbranding': 1,    // Strips excessive YouTube graphics
+                    'fs': 0,                // Prevents native fullscreen trigger conflicts
+                    'iv_load_policy': 3,    // Suppresses text callouts/annotations
+                    'origin': window.location.origin // Explicit origin handshake helps counter error 153
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            // Programmatically inject the referrerpolicy token right into the generated backend iframe
+            const iframe = document.getElementById('yt-iframe-placeholder');
+            if (iframe) {
+                iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+            }
+            
+            logError(""); 
+            setupCustomControls();
+            performSearch(elements.searchInput.value);
+            updateTrackTimeline();
+        }
+
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.PLAYING) {
+                elements.playBtn.innerHTML = "⏸"; 
+                startTimelineLoop();
+            } else {
+                elements.playBtn.innerHTML = "⏵"; 
+                stopTimelineLoop();
+            }
+        }
+
+        function onPlayerError(e) {
+            console.error("Player Core Error Code:", e.data);
+            if (e.data === 153) {
+                logError("Error 153: Player identity configuration issue. Secure your HTTP referrer headers or verify you are using a local webserver.");
+            } else {
+                logError("Notice: This video cannot be played through customized external containers due to restrictions from its owner.");
+            }
+            elements.playBtn.innerHTML = "⏵";
+        }
+
+        function setupCustomControls() {
+            const togglePlayback = () => {
+                if (!player) return;
+                const state = player.getPlayerState();
+                if (state === YT.PlayerState.PLAYING) {
+                    player.pauseVideo();
+                } else {
+                    player.playVideo();
+                }
+            };
+            elements.playBtn.addEventListener('click', togglePlayback);
+            elements.clickShield.addEventListener('click', togglePlayback);
+
+            elements.muteBtn.addEventListener('click', () => {
+                if (!player) return;
+                if (player.isMuted()) {
+                    player.unMute();
+                    elements.muteBtn.innerHTML = "🔊";
+                    elements.volumeSlider.value = player.getVolume() || 50;
+                } else {
+                    player.mute();
+                    elements.muteBtn.innerHTML = "🔇";
+                    elements.volumeSlider.value = 0;
+                }
+            });
+
+            elements.volumeSlider.addEventListener('input', (e) => {
+                if (!player) return;
+                const val = parseInt(e.target.value);
+                player.setVolume(val);
+                if (val === 0) {
+                    player.mute();
+                    elements.muteBtn.innerHTML = "🔇";
+                } else {
+                    player.unMute();
+                    elements.muteBtn.innerHTML = "🔊";
+                }
+            });
+
+            elements.progressBar.addEventListener('input', (e) => {
+                if (!player) return;
+                const totalDuration = player.getDuration();
+                if (totalDuration) {
+                    const targetSeconds = (e.target.value / 100) * totalDuration;
+                    player.seekTo(targetSeconds, true);
+                }
+            });
+            
+            elements.fullscreenBtn.addEventListener('click', () => {
+                const wrapper = document.querySelector('.player-wrapper');
+                if (!document.fullscreenElement) {
+                    wrapper.requestFullscreen().catch(err => {
+                        console.error(`Error enabling fullscreen: ${err.message}`);
+                    });
+                } else {
+                    document.exitFullscreen();
+                }
+            });
+        }
+
+        function startTimelineLoop() {
+            stopTimelineLoop();
+            updateTimelineInterval = setInterval(updateTrackTimeline, 500);
+        }
+
+        function stopTimelineLoop() {
+            if (updateTimelineInterval) clearInterval(updateTimelineInterval);
+        }
+
+        function updateTrackTimeline() {
+            if (!player || typeof player.getCurrentTime !== 'function') return;
+
+            const current = player.getCurrentTime() || 0;
+            const total = player.getDuration() || 0;
+
+            if (total > 0) {
+                const percentage = (current / total) * 100;
+                elements.progressBar.value = percentage;
+            } else {
+                elements.progressBar.value = 0;
+            }
+
+            elements.timeDisplay.innerHTML = `${formatTime(current)} / ${formatTime(total)}`;
+        }
+
+        function formatTime(timeInSeconds) {
+            if (isNaN(timeInSeconds)) return "0:00";
+            const mins = Math.floor(timeInSeconds / 60);
+            const secs = Math.floor(timeInSeconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // YouTube Data API v3 Search Setup
+        elements.searchBtn.addEventListener('click', () => {
+            performSearch(elements.searchInput.value);
+        });
+
+        elements.searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') performSearch(elements.searchInput.value);
+        });
+
+        function performSearch(query) {
+            if (!query.trim()) return;
+            if (API_KEY === 'AIzaSyB54rA0zv3sUs5VUFKoZOWbp2Eka1YQ9v8') {
+                logError("Setup Action Required: Paste your secure developer token into line 150 of the script block.");
+                return;
+            }
+
+            const cleanQuery = encodeURIComponent(query);
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=${cleanQuery}&type=video&key=${API_KEY}`;
+
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP Error Code status: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    logError(""); 
+                    renderSidebar(data.items);
+                })
+                .catch(err => {
+                    console.error("Data Pipeline Fetch Failure:", err);
+                    logError("API Retrieval Fault. Verify your API key configuration, restrictions, and quota limits.");
+                });
+        }
+
+        function renderSidebar(items) {
+            elements.sidebar.innerHTML = "";
+            if (!items || items.length === 0) {
+                elements.sidebar.innerHTML = "<p style='padding:15px; color:var(--text-muted);'>No results match query.</p>";
+                return;
+            }
+
+            const initialVideo = items[0];
+            if (initialVideo && initialVideo.id && initialVideo.id.videoId) {
+                 if (elements.videoTitle.innerHTML === "Loading initial video...") {
+                     loadVideo(initialVideo.id.videoId, initialVideo.snippet.title);
+                 }
+            }
+
+            items.forEach(item => {
+                const videoId = item.id.videoId;
+                const snippet = item.snippet;
+                if (!videoId) return;
+
+                const card = document.createElement('div');
+                card.className = "video-card";
+                card.innerHTML = `
+                    <img src="${snippet.thumbnails.medium.url}" alt="thumbnail">
+                    <div class="card-info">
+                        <div class="card-title">${escapeHTML(snippet.title)}</div>
+                        <div class="card-channel">${escapeHTML(snippet.channelTitle)}</div>
+                    </div>
+                `;
+
+                card.addEventListener('click', () => {
+                    loadVideo(videoId, snippet.title);
+                });
+
+                elements.sidebar.appendChild(card);
+            });
+        }
+
+        function loadVideo(id, title) {
+            if (!player) return;
+            elements.videoTitle.innerHTML = escapeHTML(title);
+            logError(""); 
+            player.loadVideoById(id);
+        }
+
+        function logError(msg) {
+            if(msg) {
+                elements.errorContainer.innerHTML = `<div class="error-msg">${msg}</div>`;
+            } else {
+                elements.errorContainer.innerHTML = "";
+            }
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
